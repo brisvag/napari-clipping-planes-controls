@@ -1,0 +1,18 @@
+# Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
+_commit: v2.1.0
+_src_path: https://github.com/napari/napari-plugin-template
+display_name: Clipping Planes Controls
+email: brisvag@gmail.com
+full_name: Lorenzo Gaifas
+github_repository_url: https://github.com/brisvag/napari-clipping-planes-controls
+github_username_or_organization: brisvag
+include_reader_plugin: false
+include_sample_data_plugin: false
+include_widget_plugin: false
+include_writer_plugin: false
+install_dependabot: true
+install_precommit: true
+license: BSD-3
+module_name: napari_clipping_planes_controls
+plugin_name: napari-clipping-planes-controls
+short_description: Widget for controlling the clipping planes in napari.
