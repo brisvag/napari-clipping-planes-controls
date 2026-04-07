@@ -3,6 +3,15 @@ display_name: Clipping Planes Controls
 # use 'hidden' to remove plugin from napari hub search results
 visibility: public
 # see https://napari.org/stable/plugins/technical_references/manifest.html#fields for valid categories
-# categories: []
+categories: [Utilities, Visualization]
 contributions:
   commands:
+    - id: napari-clipping-planes-controls.main_widget
+      title: Controls for clipping planes
+      python_name: napari_clipping_planes_controls.controls_widget:ClippingPlanesControls
+  widgets:
+    - command: napari-clipping-planes-controls.main_widget
+      display_name: Clipping planes controls
+  menus:
+    napari/layers/visualize:
+      - command: napari-clipping-planes-controls.main_widget
