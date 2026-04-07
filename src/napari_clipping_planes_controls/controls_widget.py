@@ -41,6 +41,7 @@ class ClippingPlanesControls(QWidget):
         self.view = self.canvas.central_widget.add_view()
         self.box = None
         self._center = np.zeros(3)
+        self._locked = False
 
         self.view.camera = ArcballCamera(fov=0)
         self.view.camera.interactive = False
@@ -55,13 +56,13 @@ class ClippingPlanesControls(QWidget):
             line.transform = STTransform()
 
         self.viewer.dims.events.range.connect(self._on_extent_change)
-        self.viewer.dims.events.ndisplay.connect(self._on_extent_change)
+        self.viewer.dims.events.ndisplay.connect(self._update_lock_and_view)
         self.viewer.camera.events.connect(self._on_camera_change)
-        self.viewer.layers.selection.events.connect(self._on_extent_change)
+        self.viewer.layers.selection.events.connect(self._update_lock_and_view)
         self.canvas.events.mouse_move.connect(self._on_mouse)
         self.canvas.events.mouse_press.connect(self._on_mouse)
         self.canvas.events.resize.connect(self._on_size_change)
-        self.planes_locked.toggled.connect(self._update_lock)
+        self.planes_locked.toggled.connect(self._update_lock_and_view)
 
         self._update_lock()
         self._on_extent_change()
@@ -110,6 +111,9 @@ class ClippingPlanesControls(QWidget):
             or not self.viewer.layers.selection
             or self.planes_locked.isChecked()
         )
+
+    def _update_lock_and_view(self):
+        self._update_lock()
         self.canvas.native.setVisible(not self._locked)
         self.view.visible = not self._locked
         if not self._locked:
@@ -123,6 +127,7 @@ class ClippingPlanesControls(QWidget):
         self._on_camera_change()
 
     def _on_camera_change(self):
+        self._update_lock()
         if self._locked or self.box is None:
             return
 
@@ -177,6 +182,7 @@ class ClippingPlanesControls(QWidget):
         self._update_planes()
 
     def _on_mouse(self, event=None):
+        self._update_lock()
         if self._locked:
             return
         if self.viewer.layers.selection and (
@@ -195,6 +201,7 @@ class ClippingPlanesControls(QWidget):
             self._update_planes()
 
     def _update_planes(self):
+        self._update_lock()
         if self._locked:
             return
         planes_world = []
