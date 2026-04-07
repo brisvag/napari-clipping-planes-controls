@@ -11,6 +11,9 @@
 
 Widget for controlling the clipping planes in napari.
 
+<img width="1280" height="785" alt="image" src="https://github.com/user-attachments/assets/5eac99c3-5142-4971-b664-161a40fbfbf3" />
+
+
 ----------------------------------
 
 This [napari] plugin was generated with [copier] using the [napari-plugin-template] (None).
