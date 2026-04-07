@@ -1,3 +1,5 @@
+import warnings
+
 import napari
 import numpy as np
 from qtpy.QtWidgets import QLabel, QVBoxLayout, QWidget
@@ -110,7 +112,9 @@ class ClippingPlanesControls(QWidget):
         )
         self.canvas.native.setVisible(not self._locked)
         self.view.visible = not self._locked
-        self._update_planes()
+        if not self._locked:
+            self._on_extent_change()
+            self._update_planes()
 
     def _on_size_change(self, event=None):
         X = self.canvas.size[0] / 2
@@ -135,7 +139,9 @@ class ClippingPlanesControls(QWidget):
         side = Rotation.from_rotvec(np.array(up) * 90, degrees=True).apply(
             view
         )
-        self.camera_model.set_view_direction(side, up)
+        with warnings.catch_warnings():
+            warnings.filterwarnings(action='ignore', message='gimbal lock')
+            self.camera_model.set_view_direction(side, up)
 
         # --------------------------------------------------------
         # this section is copied from VispyCamera logic
