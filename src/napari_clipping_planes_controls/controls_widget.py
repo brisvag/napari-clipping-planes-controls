@@ -2,17 +2,22 @@ import warnings
 
 import napari
 import numpy as np
-from qtpy.QtWidgets import QLabel, QVBoxLayout, QWidget
+from qtpy.QtWidgets import (
+    QFormLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 from scipy.spatial.transform import Rotation
-from superqt import QToggleSwitch
+from superqt import QLabeledDoubleSlider, QToggleSwitch
 from vispy.scene import ArcballCamera, Box, InfiniteLine, SceneCanvas
 from vispy.util.quaternion import Quaternion
 from vispy.visuals.transforms import MatrixTransform, STTransform
 
-# TODO: allow adding multiple and controlling direction
 
-
-class ClippingPlanesControls(QWidget):
+class ClippingPlanesSideViewControls(QWidget):
     def __init__(self, viewer: napari.Viewer):
         super().__init__()
         self.viewer = viewer
@@ -27,7 +32,7 @@ class ClippingPlanesControls(QWidget):
         self.info = QLabel(
             'This is a side view of the main napari canvas.\n'
             'Select a layer in the layerlist, then \n'
-            'click/drag below to move its clipping planes.\n'
+            'click/drag below to move its clipping planes.'
         )
         self.planes_locked = QToggleSwitch('Lock planes.')
 
@@ -235,3 +240,175 @@ class ClippingPlanesControls(QWidget):
                     }
                 )
             layer.experimental_clipping_planes = planes
+
+
+class ClippingPlanesSliderControls(QWidget):
+    def __init__(self, viewer: napari.Viewer):
+        super().__init__()
+        self.viewer = viewer
+
+        # general layout
+        lay = QVBoxLayout()
+        self.setLayout(lay)
+
+        self.info = QLabel(
+            'This widget provides slider controls for clipping planes.\n'
+            'Select a layer in the layerlist, then use the +/- button\n'
+            'to add/remove clipping planes, and the respective sliders\n'
+            'to change their position and direction.\n'
+            'Slider position is relative to the bounding sphere\n'
+            'of the selected layer extent.'
+        )
+
+        btns = QHBoxLayout()
+        self.add_btn = QPushButton('+')
+        self.remove_btn = QPushButton('-')
+        btns.addWidget(self.add_btn)
+        btns.addWidget(self.remove_btn)
+
+        self.sliders_layout = QVBoxLayout()
+
+        lay.addWidget(self.info)
+        lay.addLayout(btns)
+        lay.addLayout(self.sliders_layout)
+
+        self.slider_map = {}
+        self.plane_directions = {}
+        self.selection = None
+
+        self.viewer.layers.selection.events.active.connect(
+            self._on_selection_changed
+        )
+        self.add_btn.pressed.connect(self._add_plane)
+        self.remove_btn.pressed.connect(self._remove_plane)
+
+        self._on_selection_changed()
+
+    def _on_selection_changed(self):
+        active = self.viewer.layers.selection.active
+        if active is not None:
+            active.experimental_clipping_planes.events.inserted.connect(
+                self._update_sliders
+            )
+            active.experimental_clipping_planes.events.removed.connect(
+                self._update_sliders
+            )
+        if self.selection is not None:
+            self.selection.experimental_clipping_planes.events.inserted.disconnect(
+                self._update_sliders
+            )
+            self.selection.experimental_clipping_planes.events.removed.disconnect(
+                self._update_sliders
+            )
+        self.selection = active
+
+        self._update_sliders()
+
+    def _add_plane(self):
+        if self.selection is None:
+            return
+        self.selection.experimental_clipping_planes.add_plane()
+
+    def _remove_plane(self):
+        if self.selection is None:
+            return
+        self.selection.experimental_clipping_planes.pop()
+
+    def _update_sliders(self):
+        _clear_layout(self.sliders_layout)
+        self.slider_map.clear()
+
+        if self.selection is None:
+            return
+
+        for i, plane in enumerate(self.selection.experimental_clipping_planes):
+            sliders = self._make_plane_sliders(plane)
+            self.slider_map[plane] = sliders
+
+            self.sliders_layout.addWidget(QLabel(f'Plane {i}:'))
+            lay = QFormLayout()
+            for label, slider in sliders.items():
+                lay.addRow(label, slider)
+            self.sliders_layout.addLayout(lay)
+
+    def _get_bounding_sphere(self):
+        displayed = self.viewer.dims.displayed
+        extents = self.viewer.layers.get_extent(
+            self.viewer.layers.selection
+        ).world[:, displayed]
+
+        sizes = extents[1] - extents[0]
+        if len(sizes) == 2:
+            # 3D view but only 2D layers, add z
+            sizes = np.pad(sizes, (1, 0))
+        sphere_center = np.mean(extents, axis=0)
+        sphere_radius = 0.5 * np.sqrt(np.sum(sizes**2))
+
+        return sphere_center, sphere_radius
+
+    def _make_plane_sliders(self, plane):
+        sliders = {}
+        angles = _normal_to_angles(plane.normal)
+        for name, angle in zip(('rot', 'tilt', 'psi'), angles, strict=True):
+            slider = QLabeledDoubleSlider()
+            slider.setRange(0, 180)
+            slider.setValue(angle)
+            sliders[name] = slider
+
+        slider = QLabeledDoubleSlider()
+        slider.setRange(-1, 1)
+        sphere_center, sphere_radius = self._get_bounding_sphere()
+        pos = plane.position - sphere_center
+        self.plane_directions[plane] = pos / np.linalg.norm(pos)
+        pos_rel = np.linalg.norm(pos) / sphere_radius
+        slider.setValue(pos_rel)
+        sliders['pos'] = slider
+
+        callback = self._plane_update_callback(plane)
+        for slider in sliders.values():
+            slider.valueChanged.connect(callback)
+
+        return sliders
+
+    def _plane_update_callback(self, plane):
+        def plane_callback(value):
+            sliders = self.slider_map[plane]
+            angles = np.array([s.value() for s in sliders.values()][:-1])
+            normal = _angles_to_normal(angles)
+            if not np.allclose(normal, plane.normal):
+                plane.normal = normal
+
+            sphere_center, sphere_radius = self._get_bounding_sphere()
+            rel_pos = sliders['pos'].value()
+            pos = (
+                sphere_center
+                + rel_pos * sphere_radius * 2 * self.plane_directions[plane]
+            )
+            if not np.allclose(pos, plane.position):
+                plane.position = pos
+
+        return plane_callback
+
+
+def _normal_to_angles(normal):
+    rot = Rotation.align_vectors([normal], [[0, 0, 1]])[0]
+    with warnings.catch_warnings():
+        warnings.filterwarnings(action='ignore', message='gimbal lock')
+        return rot.as_euler('xyz', degrees=True)
+
+
+def _angles_to_normal(angles):
+    rot = Rotation.from_euler('xyz', angles, degrees=True)
+    return rot.apply([0, 0, 1])
+
+
+def _clear_layout(layout):
+    for _ in range(layout.count()):
+        item = layout.takeAt(0)
+        widget = item.widget()
+        if widget is not None:
+            widget.deleteLater()
+        else:
+            child_layout = item.layout()
+            if child_layout is not None:
+                _clear_layout(child_layout)

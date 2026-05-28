@@ -6,12 +6,18 @@ visibility: public
 categories: [Utilities, Visualization]
 contributions:
   commands:
-    - id: napari-clipping-planes-controls.main_widget
-      title: Controls for clipping planes
-      python_name: napari_clipping_planes_controls.controls_widget:ClippingPlanesControls
+    - id: napari-clipping-planes-controls.side_view_widget
+      title: Side view controls for clipping planes
+      python_name: napari_clipping_planes_controls.controls_widget:ClippingPlanesSideViewControls
+    - id: napari-clipping-planes-controls.slider_widget
+      title: Slider controls for clipping planes
+      python_name: napari_clipping_planes_controls.controls_widget:ClippingPlanesSliderControls
   widgets:
-    - command: napari-clipping-planes-controls.main_widget
-      display_name: Clipping planes controls
+    - command: napari-clipping-planes-controls.side_view_widget
+      display_name: Clipping planes side view controls
+    - command: napari-clipping-planes-controls.slider_widget
+      display_name: Clipping planes slider controls
   menus:
     napari/layers/visualize:
-      - command: napari-clipping-planes-controls.main_widget
+      - command: napari-clipping-planes-controls.side_view_widget
+      - command: napari-clipping-planes-controls.slider_widget
