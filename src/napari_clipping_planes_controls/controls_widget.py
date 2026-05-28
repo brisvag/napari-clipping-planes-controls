@@ -1,4 +1,5 @@
 import warnings
+from contextlib import contextmanager
 
 import napari
 import numpy as np
@@ -224,22 +225,24 @@ class ClippingPlanesSideViewControls(QWidget):
         # set plane data to each layer
         displayed = list(self.viewer.dims.displayed)
         for layer in self.viewer.layers.selection:
-            planes = []
-            for plane in planes_world:
+            for idx, plane in enumerate(planes_world):
                 world_pos_full = np.zeros(self.viewer.dims.ndim)
                 world_pos_full[displayed] = plane[0]
 
                 world_norm_full = np.zeros(self.viewer.dims.ndim)
                 world_norm_full[displayed] = plane[1]
 
-                planes.append(
-                    {
-                        'position': world_pos_full,
-                        'normal': world_norm_full,
-                        'enabled': True,
-                    }
-                )
-            layer.experimental_clipping_planes = planes
+                lay_planes = layer.experimental_clipping_planes
+
+                plane = {
+                    'position': world_pos_full,
+                    'normal': world_norm_full,
+                    'enabled': True,
+                }
+                if len(lay_planes) <= idx:
+                    lay_planes.add_plane(**plane)
+                else:
+                    lay_planes[idx].update(plane)
 
 
 class ClippingPlanesSliderControls(QWidget):
@@ -316,6 +319,9 @@ class ClippingPlanesSliderControls(QWidget):
 
     def _update_sliders(self):
         _clear_layout(self.sliders_layout)
+
+        for plane in self.slider_map:
+            plane.events.disconnect(self._update_slider_values)
         self.slider_map.clear()
 
         if self.selection is None:
@@ -348,27 +354,41 @@ class ClippingPlanesSliderControls(QWidget):
 
     def _make_plane_sliders(self, plane):
         sliders = {}
-        angles = _normal_to_angles(plane.normal)
-        for name, angle in zip(('rot', 'tilt', 'psi'), angles, strict=True):
+        for name in ('rot', 'tilt', 'psi'):
             slider = QLabeledDoubleSlider()
             slider.setRange(0, 180)
-            slider.setValue(angle)
             sliders[name] = slider
 
         slider = QLabeledDoubleSlider()
         slider.setRange(-1, 1)
-        sphere_center, sphere_radius = self._get_bounding_sphere()
-        pos = plane.position - sphere_center
-        self.plane_directions[plane] = pos / np.linalg.norm(pos)
-        pos_rel = np.linalg.norm(pos) / sphere_radius
-        slider.setValue(pos_rel)
         sliders['pos'] = slider
+        self.plane_directions[plane] = np.ones(3)
 
         callback = self._plane_update_callback(plane)
         for slider in sliders.values():
             slider.valueChanged.connect(callback)
 
+        plane.events.connect(self._update_slider_values)
+
         return sliders
+
+    def _update_slider_values(self):
+        sphere_center, sphere_radius = self._get_bounding_sphere()
+        for plane, sliders in self.slider_map.items():
+            angles = _normal_to_angles(plane.normal)
+            for name, angle in zip(
+                ('rot', 'tilt', 'psi'), angles, strict=True
+            ):
+                slider = sliders[name]
+                with qt_signals_blocked(slider):
+                    slider.setValue(angle)
+
+            slider = sliders['pos']
+            pos = plane.position - sphere_center
+            self.plane_directions[plane] = pos / np.linalg.norm(pos)
+            pos_rel = np.linalg.norm(pos) / sphere_radius
+            with qt_signals_blocked(slider):
+                slider.setValue(pos_rel)
 
     def _plane_update_callback(self, plane):
         def plane_callback(value):
@@ -394,7 +414,8 @@ def _normal_to_angles(normal):
     rot = Rotation.align_vectors([normal], [[0, 0, 1]])[0]
     with warnings.catch_warnings():
         warnings.filterwarnings(action='ignore', message='gimbal lock')
-        return rot.as_euler('xyz', degrees=True)
+        angles = rot.as_euler('xyz', degrees=True)
+    return np.mod(angles, 180)
 
 
 def _angles_to_normal(angles):
@@ -412,3 +433,13 @@ def _clear_layout(layout):
             child_layout = item.layout()
             if child_layout is not None:
                 _clear_layout(child_layout)
+
+
+@contextmanager
+def qt_signals_blocked(obj):
+    """Context manager to temporarily block signals from `obj`"""
+    previous = obj.blockSignals(True)
+    try:
+        yield
+    finally:
+        obj.blockSignals(previous)

@@ -1,7 +1,7 @@
 [project]
 name = "napari-clipping-planes-controls"
 dynamic = ["version"]
-description = "Widget for controlling the clipping planes in napari."
+description = "Widgets for controlling the clipping planes in napari."
 readme = "README.md"
 license = "BSD-3-Clause"
 license-files = ["LICENSE"]

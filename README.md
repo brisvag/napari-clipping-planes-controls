@@ -9,7 +9,7 @@
 [![npe2](https://img.shields.io/badge/plugin-npe2-blue?link=https://napari.org/stable/plugins/index.html)](https://napari.org/stable/plugins/index.html)
 [![Copier](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/copier-org/copier/master/img/badge/badge-grayscale-inverted-border-purple.json)](https://github.com/copier-org/copier)
 
-Widget for controlling the clipping planes in napari.
+Widgets for controlling the clipping planes in napari.
 
 <img width="1280" height="785" alt="image" src="https://github.com/user-attachments/assets/5eac99c3-5142-4971-b664-161a40fbfbf3" />
 
