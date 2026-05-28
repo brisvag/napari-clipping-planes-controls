@@ -9,10 +9,7 @@ from vispy.scene import ArcballCamera, Box, InfiniteLine, SceneCanvas
 from vispy.util.quaternion import Quaternion
 from vispy.visuals.transforms import MatrixTransform, STTransform
 
-# TODO: scaled layer mess up the math :/
 # TODO: allow adding multiple and controlling direction
-# TODO: allow "locking" planes, hiding them from view and leaving them there
-#       (currently doable by deselecting all layers)
 
 
 class ClippingPlanesControls(QWidget):
