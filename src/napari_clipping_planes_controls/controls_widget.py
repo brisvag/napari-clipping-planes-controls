@@ -211,7 +211,9 @@ class ClippingPlanesControls(QWidget):
             )
             data_offset = offset / zoom
             offset_direction = np.array(self.viewer.camera.view_direction)
-            offset_position = self._center + offset_direction * data_offset
+            offset_position = (
+                self.viewer.camera.center + offset_direction * data_offset
+            )
             planes_world.append([offset_position, offset_direction])
 
         # flip normal for second plane
