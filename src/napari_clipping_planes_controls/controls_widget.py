@@ -219,27 +219,22 @@ class ClippingPlanesControls(QWidget):
         # flip normal for second plane
         planes_world[1][1] *= -1
 
-        # convert to data coordinates
+        # set plane data to each layer
         displayed = list(self.viewer.dims.displayed)
         for layer in self.viewer.layers.selection:
-            if layer.ndim < 3:
-                continue
-
-            planes_data = []
+            planes = []
             for plane in planes_world:
                 world_pos_full = np.zeros(self.viewer.dims.ndim)
                 world_pos_full[displayed] = plane[0]
-                data_pos = layer.world_to_data(world_pos_full)[displayed]
 
                 world_norm_full = np.zeros(self.viewer.dims.ndim)
                 world_norm_full[displayed] = plane[1]
-                data_norm = layer.world_to_data(world_norm_full)[displayed]
 
-                planes_data.append(
+                planes.append(
                     {
-                        'position': data_pos,
-                        'normal': data_norm,
+                        'position': world_pos_full,
+                        'normal': world_norm_full,
                         'enabled': True,
                     }
                 )
-            layer.experimental_clipping_planes = planes_data
+            layer.experimental_clipping_planes = planes
