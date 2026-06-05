@@ -1,5 +1,5 @@
 import warnings
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 
 import napari
 import numpy as np
@@ -337,6 +337,8 @@ class ClippingPlanesSliderControls(QWidget):
                 lay.addRow(label, slider)
             self.sliders_layout.addLayout(lay)
 
+        self._update_slider_values()
+
     def _get_bounding_sphere(self):
         displayed = self.viewer.dims.displayed
         extents = self.viewer.layers.get_extent(
@@ -362,7 +364,7 @@ class ClippingPlanesSliderControls(QWidget):
         slider = QLabeledDoubleSlider()
         slider.setRange(-1, 1)
         sliders['pos'] = slider
-        self.plane_directions[plane] = np.ones(3)
+        self.plane_directions[plane] = np.array([1, 0, 0])
 
         callback = self._plane_update_callback(plane)
         for slider in sliders.values():
@@ -372,23 +374,29 @@ class ClippingPlanesSliderControls(QWidget):
 
         return sliders
 
-    def _update_slider_values(self):
+    def _update_slider_values(self, event=None):
         sphere_center, sphere_radius = self._get_bounding_sphere()
         for plane, sliders in self.slider_map.items():
-            angles = _normal_to_angles(plane.normal)
-            for name, angle in zip(
-                ('rot', 'tilt', 'psi'), angles, strict=True
-            ):
-                slider = sliders[name]
-                with qt_signals_blocked(slider):
+            if event is not None and plane is event.source:
+                continue
+            with ExitStack() as stack:
+                for slider in sliders.values():
+                    stack.enter_context(qt_signals_blocked(slider))
+
+                angles = _normal_to_angles(plane.normal)
+                for name, angle in zip(
+                    ('rot', 'tilt', 'psi'), angles, strict=True
+                ):
+                    slider = sliders[name]
                     slider.setValue(angle)
 
-            slider = sliders['pos']
-            pos = plane.position - sphere_center
-            self.plane_directions[plane] = pos / np.linalg.norm(pos)
-            pos_rel = np.linalg.norm(pos) / sphere_radius
-            with qt_signals_blocked(slider):
+                slider = sliders['pos']
+                pos = plane.position - sphere_center
+                norm = np.linalg.norm(pos)
+                direction = pos / norm if norm else np.array([1, 0, 0])
+                pos_rel = norm * np.sign(np.mean(pos)) / sphere_radius
                 slider.setValue(pos_rel)
+                self.plane_directions[plane] = direction
 
     def _plane_update_callback(self, plane):
         def plane_callback(value):
