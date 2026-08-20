@@ -3,6 +3,7 @@ from contextlib import ExitStack, contextmanager
 
 import napari
 import numpy as np
+from napari._vispy.camera import get_vispy_flipped_axes
 from qtpy.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
@@ -155,7 +156,7 @@ class ClippingPlanesSideViewControls(QWidget):
         # this section is copied from VispyCamera logic
         # flip handedness so the rotation is always righthanded even with axis flipping
         angles = self.camera_model.angles * np.where(
-            self.camera_model._vispy_flipped_axes(ndisplay=3), -1, 1
+            get_vispy_flipped_axes(self.camera_model, ndisplay=3), -1, 1
         )
         # undo vispy quirks (rotation of 90 digrees and lefthanded y axis)
         angles = (np.array(angles) * (1, -1, 1)) + (0, 0, 90)
